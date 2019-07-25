@@ -16,38 +16,46 @@ BANNER_MESSAGE_TEXT='You are accessing a U.S. Government (USG) Information Syste
 echo -e "${BANNER_MESSAGE_TEXT}" > /etc/issue
 echo -e "${BANNER_MESSAGE_TEXT}" > /etc/issue.net
 
+
 ########################################
 # DISA STIG PAM Configurations
 ########################################
 cat <<EOF > /etc/pam.d/system-auth-local
 #%PAM-1.0
 auth required pam_env.so
-auth required pam_lastlog.so inactive=35
-auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+#auth required pam_lastlog.so inactive=35
+auth required pam_faillock.so preauth silent audit deny=3 unlock_time=never fail_interval=900
 auth sufficient pam_unix.so try_first_pass
-auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
-auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+auth [default=die] pam_faillock.so authfail audit deny=3
+auth sufficient pam_faillock.so authsucc audit deny=3
 auth requisite pam_succeed_if.so uid >= 1000 quiet
+auth required pam_warn.so
 auth required pam_deny.so
 
 account required pam_faillock.so
+account [default=1 success=ignore] pam_succeed_if.so user in root quiet
+account [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
 account required pam_unix.so
-account required pam_lastlog.so inactive=35
+#account required pam_lastlog.so inactive=35
 account sufficient pam_localuser.so
 account sufficient pam_succeed_if.so uid < 1000 quiet
 account required pam_permit.so
+account required pam_warn.so
 
 # Password Quality now set in /etc/security/pwquality.conf
-password required pam_pwquality.so retry=3
-password sufficient pam_unix.so sha512 shadow try_first_pass use_authtok remember=24
+password required pam_pwquality.so try_first_pass local_users_only retry=3 minlen=15 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 auth_type=
+password required pam_pwhistory.so use_authtok remember=24
+password sufficient pam_unix.so sha512 shadow try_first_pass use_authtok
+password required pam_warn.so
 password required pam_deny.so
 
-session required pam_lastlog.so showfailed
 session optional pam_keyinit.so revoke
 session required pam_limits.so
 -session optional pam_systemd.so
-session [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session [success=2 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session required pam_lastlog.so showfailed
 session required pam_unix.so
+session required pam_warn.so
 EOF
 ln -sf /etc/pam.d/system-auth-local /etc/pam.d/system-auth
 cp -f /etc/pam.d/system-auth-local /etc/pam.d/system-auth-ac
@@ -55,32 +63,39 @@ cp -f /etc/pam.d/system-auth-local /etc/pam.d/system-auth-ac
 cat <<EOF > /etc/pam.d/password-auth-local
 #%PAM-1.0
 auth required pam_env.so
-auth required pam_lastlog.so inactive=35
-auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+#auth required pam_lastlog.so inactive=35
+auth required pam_faillock.so preauth silent audit deny=3 unlock_time=never fail_interval=900
 auth sufficient pam_unix.so try_first_pass
-auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
-auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+auth [default=die] pam_faillock.so authfail audit deny=3
+auth sufficient pam_faillock.so authsucc audit deny=3
 auth requisite pam_succeed_if.so uid >= 1000 quiet
+auth required pam_warn.so
 auth required pam_deny.so
 
 account required pam_faillock.so
+account [default=1 success=ignore] pam_succeed_if.so user in root quiet
+account [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
 account required pam_unix.so
-account required pam_lastlog.so inactive=35
+#account required pam_lastlog.so inactive=35
 account sufficient pam_localuser.so
 account sufficient pam_succeed_if.so uid < 1000 quiet
 account required pam_permit.so
+account required pam_warn.so
 
 # Password Quality now set in /etc/security/pwquality.conf
-password required pam_pwquality.so retry=3
-password sufficient pam_unix.so sha512 shadow try_first_pass use_authtok remember=24
+password required pam_pwquality.so try_first_pass local_users_only retry=3 minlen=15 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 auth_type=
+password required pam_pwhistory.so use_authtok remember=24
+password sufficient pam_unix.so sha512 shadow try_first_pass use_authtok
+password required pam_warn.so
 password required pam_deny.so
 
-session required pam_lastlog.so showfailed
 session optional pam_keyinit.so revoke
 session required pam_limits.so
 -session optional pam_systemd.so
-session [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session [success=2 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session required pam_lastlog.so showfailed
 session required pam_unix.so
+session required pam_warn.so
 EOF
 ln -sf /etc/pam.d/password-auth-local /etc/pam.d/password-auth
 cp -f /etc/pam.d/password-auth-local /etc/pam.d/password-auth-ac
@@ -92,7 +107,7 @@ cat <<EOF > /etc/security/pwquality.conf
 # Number of characters in the new password that must not be present in the
 # old password.
 # difok = 5
-difok = 15
+difok = 8
 #
 # Minimum acceptable size for the new password (plus one if
 # credits are not disabled which is the default). (See pam_cracklib manual.)
@@ -200,6 +215,7 @@ logdir /var/log/chrony
 #log measurements statistics tracking
 EOF
 
+
 ########################################
 # STIG Audit Configuration
 ########################################
@@ -216,7 +232,13 @@ cat <<EOF > /etc/audit/rules.d/audit.rules
 -b 16384
 
 # Failure of auditd causes a kernel panic
--f 2
+-f 1
+
+# Ignore all the anonymous events. Often tagged on every rule, but ignoring 
+# up front should improve processing time
+-a exit,never -F auid=4294967295
+# Ignore system services
+-a exit,never -F auid<1000
 
 ###########################
 ## DISA STIG Audit Rules ##
@@ -354,12 +376,6 @@ cat <<EOF > /etc/audit/rules.d/audit.rules
 -a always,exit -F arch=b32 -S init_module -S delete_module -k modules
 -a always,exit -F arch=b64 -S init_module -S delete_module -k modules
 
-# Ignore all the anonymous events. Often tagged on every rule, but ignoring 
-# up front should improve processing time
--a exit,never -F auid=4294967295
-# Ignore system services
--a exit,never -F auid<1000
-
 #2.6.2.4.7 Ensure auditd Collects Discretionary Access Control Permission Modification Events
 -a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -k perm_mod
 -a always,exit -F arch=b32 -S chown -S fchown -S fchownat -S lchown -k perm_mod
@@ -375,17 +391,17 @@ cat <<EOF > /etc/audit/rules.d/audit.rules
 -a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -k access
 
 #2.6.2.4.9 Ensure auditd Collects Information on the Use of Privileged Commands
--a always,exit -F path=/sbin/semanage -F perm=x -F key=privileged-priv_change
--a always,exit -F path=/sbin/setsebool -F perm=x -F key=privileged-priv_change
--a always,exit -F path=/bin/chcon -F perm=x -F key=privileged-priv_change
--a always,exit -F path=/sbin/restorecon -F perm=x -F key=privileged-priv_change
--a always,exit -F path=/bin/userhelper -F perm=x -F key=privileged
--a always,exit -F path=/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
--a always,exit -F path=/bin/sudo -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
+-a always,exit -F path=/sbin/semanage -F perm=x -k privileged-priv_change
+-a always,exit -F path=/sbin/setsebool -F perm=x -k privileged-priv_change
+-a always,exit -F path=/bin/chcon -F perm=x -k privileged-priv_change
+-a always,exit -F path=/sbin/restorecon -F perm=x -k privileged-priv_change
+-a always,exit -F path=/bin/userhelper -F perm=x -k privileged
+-a always,exit -F path=/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged
+-a always,exit -F path=/bin/sudo -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged
 EOF
 # Find all privileged commands and monitor them
 for fs in $(awk '($3 ~ /(ext[234])|(xfs)/) {print $2}' /proc/mounts) ; do
-	find $fs -xdev -type f \( -perm -4000 -o -perm -2000 \) | awk '{print "-a always,exit -F path=" $1 " -F perm=x -F key=privileged" }' >> /etc/audit/rules.d/audit.rules
+	find $fs -xdev -type f \( -perm -4000 -o -perm -2000 \) | awk '{print "-a always,exit -F path=" $1 " -F perm=x -k privileged" }' >> /etc/audit/rules.d/audit.rules
 done
 cat <<EOF >> /etc/audit/rules.d/audit.rules
 
@@ -398,7 +414,7 @@ cat <<EOF >> /etc/audit/rules.d/audit.rules
 -a always,exit -F arch=b64 -S unlink -S rmdir -S unlinkat -S rename -S renameat -k delete
 
 #2.6.2.4.14 Make the auditd Configuration Immutable
--e 2
+#-e 2
 EOF
 
 cat <<EOF >> /etc/audit/auditd.conf
@@ -439,6 +455,7 @@ krb5_principal = auditd
 distribute_network = no
 EOF
 
+
 ########################################
 # Fix cron.allow
 ########################################
@@ -464,19 +481,20 @@ ln -sf /dev/null /etc/systemd/system/ctrl-alt-del.target
 ########################################
 cat /dev/null > /etc/securetty
 
+
 ########################################
 # Disable Interactive Shell (Timeout)
 ########################################
 cat <<EOF > /etc/profile.d/autologout.sh
 #!/bin/sh
-TMOUT=900
-export TMOUT
-readonly TMOUT
+#TMOUT=900
+#export TMOUT
+#readonly TMOUT
 EOF
 cat <<EOF > /etc/profile.d/autologout.csh
 #!/bin/csh
-set autologout=15
-set -r autologout
+#set autologout=15
+#set -r autologout
 EOF
 chown root:root /etc/profile.d/autologout.sh
 chown root:root /etc/profile.d/autologout.csh
@@ -557,7 +575,7 @@ echo "Protocol 2" >> /etc/ssh/sshd_config
 echo "Ciphers aes128-ctr,aes192-ctr,aes256-ctr" >> /etc/ssh/sshd_config
 echo "MACs hmac-sha2-512,hmac-sha2-256" >> /etc/ssh/sshd_config
 echo "PrintLastLog yes" >> /etc/ssh/sshd_config
-echo "AllowGroups sshusers" >> /etc/ssh/sshd_config
+#echo "AllowGroups sshusers" >> /etc/ssh/sshd_config
 echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
 echo "Banner /etc/issue" >> /etc/ssh/sshd_config
 echo "RhostsRSAAuthentication no" >> /etc/ssh/sshd_config
@@ -658,16 +676,17 @@ echo -e "tmpfs\t\t\t/dev/shm\t\ttmpfs\tnoexec,nosuid,nodev\t\t0 0" >> /etc/fstab
 ########################################
 # File Ownership 
 ########################################
-find / -nouser -print | xargs chown root
-find / -nogroup -print | xargs chown :root
-cat <<EOF > /etc/cron.daily/unowned_files
-#!/bin/sh
-# Fix user and group ownership of files without user
-find / -nouser -print | xargs chown root
-find / -nogroup -print | xargs chown :root
-EOF
-chown root:root /etc/cron.daily/unowned_files
-chmod 0700 /etc/cron.daily/unowned_files
+#find / -nouser -print | xargs chown root
+#find / -nogroup -print | xargs chown :root
+#cat <<EOF > /etc/cron.daily/unowned_files
+##!/bin/sh
+## Fix user and group ownership of files without user
+#find / -nouser -print | xargs chown root
+#find / -nogroup -print | xargs chown :root
+#EOF
+#chown root:root /etc/cron.daily/unowned_files
+#chmod 0700 /etc/cron.daily/unowned_files
+
 
 ########################################
 # USGCB Blacklist
