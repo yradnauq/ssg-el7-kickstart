@@ -2,13 +2,12 @@
 # This script was written by Frank Caviggia, Red Hat Consulting
 # Last update was 14 Apri 2017
 # This script is NOT SUPPORTED by Red Hat Global Support Services.
-# Please contact Rick Tavares for more information.
 #
 # Script: ssg-suplemental.sh (system-hardening)
 # Description: RHEL 7 Hardening Supplemental to SSG
-# License: GPL (see COPYING)
+# License: Apache License, Version 2.0
 # Copyright: Red Hat Consulting, March 2015
-# Author: Frank Caviggia <fcaviggi (at) redhat.com>
+# Author: Frank Caviggia (fcaviggia@gmail.com)
 
 ########################################
 # LEGAL BANNER CONFIGURATION
@@ -24,10 +23,10 @@ cat <<EOF > /etc/pam.d/system-auth-local
 #%PAM-1.0
 auth required pam_env.so
 auth required pam_lastlog.so inactive=35
-auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
+auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
 auth sufficient pam_unix.so try_first_pass
-auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
-auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
+auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
 auth requisite pam_succeed_if.so uid >= 1000 quiet
 auth required pam_deny.so
 
@@ -57,10 +56,10 @@ cat <<EOF > /etc/pam.d/password-auth-local
 #%PAM-1.0
 auth required pam_env.so
 auth required pam_lastlog.so inactive=35
-auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
+auth required pam_faillock.so preauth silent audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
 auth sufficient pam_unix.so try_first_pass
-auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
-auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=604800 fail_interval=900
+auth [default=die] pam_faillock.so authfail audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
+auth sufficient pam_faillock.so authsucc audit deny=3 even_deny_root root_unlock_time=900 unlock_time=never fail_interval=900
 auth requisite pam_succeed_if.so uid >= 1000 quiet
 auth required pam_deny.so
 
@@ -146,7 +145,60 @@ maxclassrepeat = 2
 EOF
 
 echo -e "FAIL_DELAY\t4" >> /etc/login.defs
+echo -e "CREATE_HOME\tyes" >> /etc/login.defs
 
+
+####################################
+## Secured NTP Configuration
+####################################
+cat <<EOF > /etc/ntp.conf
+# by default act only as a basic NTP client
+restrict -4 default nomodify nopeer noquery notrap
+restrict -6 default nomodify nopeer noquery notrap
+# allow NTP messages from the loopback address, useful for debugging
+restrict 127.0.0.1
+restrict ::1
+# poll server at higher rate to prevent drift
+maxpoll 10
+# server(s) we time sync to
+##server 192.168.0.1
+##server 2001:DB9::1
+#server time.example.net
+server tick.usno.navy.mil
+server tock.usno.navy.mil
+EOF
+
+cat <<EOF > /etc/chrony.conf
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+# server freeipa.local.lan iburst
+server tick.usno.navy.mil iburst
+server tock.usno.navy.mil iburst
+# Record the rate at which the system clock gains/losses time.
+driftfile /var/lib/chrony/drift
+# Allow the system clock to be stepped in the first three updates
+# if its offset is larger than 1 second.
+makestep 1.0 3
+# Enable kernel synchronization of the real-time clock (RTC).
+rtcsync
+# Enable hardware timestamping on all interfaces that support it.
+hwtimestamp *
+# Increase the minimum number of selectable sources required to adjust
+# the system clock.
+#minsources 2
+# Allow NTP client access from local network.
+#allow 192.168.0.0/16
+# Serve time even if not synchronized to a time source.
+local stratum 10
+# Specify file containing keys for NTP authentication.
+keyfile /etc/chrony.keys
+# Get TAI-UTC offset and leap seconds from the system tz database.
+leapsectz right/UTC
+# Specify directory for log files.
+logdir /var/log/chrony
+# Select which information is logged.
+#log measurements statistics tracking
+EOF
 
 ########################################
 # STIG Audit Configuration
@@ -261,10 +313,8 @@ cat <<EOF > /etc/audit/rules.d/audit.rules
 ##############################
 
 #2.6.2.4.1 Records Events that Modify Date and Time Information
--a always,exit -F arch=b32 -S adjtimex -S stime -S settimeofday -k time-change
--a always,exit -F arch=b32 -S clock_settime -k time-change
--a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change
--a always,exit -F arch=b64 -S clock_settime -k time-change
+-a always,exit -F arch=b32 -S adjtimex -S stime -S settimeofday -S clock_settime -k time-change
+-a always,exit -F arch=b64 -S adjtimex -S settimeofday -S clock_settime -k time-change
 -w /etc/localtime -p wa -k time-change
 
 #2.6.2.4.2 Record Events that Modify User/Group Information
@@ -294,43 +344,6 @@ cat <<EOF > /etc/audit/rules.d/audit.rules
 -w /var/log/btmp -p wa -k session
 -w /var/log/wtmp -p wa -k session
 
-#2.6.2.4.7 Ensure auditd Collects Discretionary Access Control Permission Modification Events
--a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod
--a always,exit -F arch=b32 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod
--a always,exit -F arch=b32 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod
--a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod
--a always,exit -F arch=b64 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod
--a always,exit -F arch=b64 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod
-
-#2.6.2.4.8 Ensure auditd Collects Unauthorized Access Attempts to Files (unsuccessful)
--a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access
--a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access
--a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access
--a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access
-
-#2.6.2.4.9 Ensure auditd Collects Information on the Use of Privileged Commands
--a always,exit -F path=/usr/sbin/semanage -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged-priv_change
--a always,exit -F path=/usr/sbin/setsebool -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged-priv_change
--a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged-priv_change
--a always,exit -F path=/usr/sbin/restorecon -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged-priv_change
--a always,exit -F path=/usr/bin/userhelper -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
--a always,exit -F path=/usr/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
--a always,exit -F path=/usr/libexec/pt_chown -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
-EOF
-# Find All privileged commands and monitor them
-for PROG in `find / -xdev -type f -perm -4000 -o -type f -perm -2000 2>/dev/null`; do
-	echo "-a always,exit -F path=$PROG -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged"  >> /etc/audit/rules.d/audit.rules
-done
-cat <<EOF >> /etc/audit/rules.d/audit.rules
-
-#2.6.2.4.10 Ensure auditd Collects Information on Exporting to Media (successful)
--a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k export
--a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k export
-
-#2.6.2.4.11 Ensure auditd Collects Files Deletion Events by User (successful and unsuccessful)
--a always,exit -F arch=b32 -S unlink -S rmdir -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete
--a always,exit -F arch=b64 -S unlink -S rmdir -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete
-
 #2.6.2.4.12 Ensure auditd Collects System Administrator Actions
 -w /etc/sudoers -p wa -k actions
 
@@ -341,10 +354,90 @@ cat <<EOF >> /etc/audit/rules.d/audit.rules
 -a always,exit -F arch=b32 -S init_module -S delete_module -k modules
 -a always,exit -F arch=b64 -S init_module -S delete_module -k modules
 
+# Ignore all the anonymous events. Often tagged on every rule, but ignoring 
+# up front should improve processing time
+-a exit,never -F auid=4294967295
+# Ignore system services
+-a exit,never -F auid<1000
+
+#2.6.2.4.7 Ensure auditd Collects Discretionary Access Control Permission Modification Events
+-a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -k perm_mod
+-a always,exit -F arch=b32 -S chown -S fchown -S fchownat -S lchown -k perm_mod
+-a always,exit -F arch=b32 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -k perm_mod
+-a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -k perm_mod
+-a always,exit -F arch=b64 -S chown -S fchown -S fchownat -S lchown -k perm_mod
+-a always,exit -F arch=b64 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -k perm_mod
+
+#2.6.2.4.8 Ensure auditd Collects Unauthorized Access Attempts to Files (unsuccessful)
+-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -k access
+-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -k access
+-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -k access
+-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -k access
+
+#2.6.2.4.9 Ensure auditd Collects Information on the Use of Privileged Commands
+-a always,exit -F path=/sbin/semanage -F perm=x -F key=privileged-priv_change
+-a always,exit -F path=/sbin/setsebool -F perm=x -F key=privileged-priv_change
+-a always,exit -F path=/bin/chcon -F perm=x -F key=privileged-priv_change
+-a always,exit -F path=/sbin/restorecon -F perm=x -F key=privileged-priv_change
+-a always,exit -F path=/bin/userhelper -F perm=x -F key=privileged
+-a always,exit -F path=/bin/sudoedit -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
+-a always,exit -F path=/bin/sudo -F perm=x -F auid>=1000 -F auid!=4294967295 -F key=privileged
+EOF
+# Find all privileged commands and monitor them
+for fs in $(awk '($3 ~ /(ext[234])|(xfs)/) {print $2}' /proc/mounts) ; do
+	find $fs -xdev -type f \( -perm -4000 -o -perm -2000 \) | awk '{print "-a always,exit -F path=" $1 " -F perm=x -F key=privileged" }' >> /etc/audit/rules.d/audit.rules
+done
+cat <<EOF >> /etc/audit/rules.d/audit.rules
+
+#2.6.2.4.10 Ensure auditd Collects Information on Exporting to Media (successful)
+-a always,exit -F arch=b32 -S mount -k export
+-a always,exit -F arch=b64 -S mount -k export
+
+#2.6.2.4.11 Ensure auditd Collects Files Deletion Events by User (successful and unsuccessful)
+-a always,exit -F arch=b32 -S unlink -S rmdir -S unlinkat -S rename -S renameat -k delete
+-a always,exit -F arch=b64 -S unlink -S rmdir -S unlinkat -S rename -S renameat -k delete
+
 #2.6.2.4.14 Make the auditd Configuration Immutable
 -e 2
 EOF
 
+cat <<EOF >> /etc/audit/auditd.conf
+#
+# This file controls the configuration of the audit daemon
+#
+
+local_events = yes
+write_logs = yes
+log_file = /var/log/audit/audit.log
+log_group = root
+log_format = RAW
+flush = INCREMENTAL_ASYNC
+freq = 50
+max_log_file = 8
+num_logs = 5
+priority_boost = 4
+disp_qos = lossy
+dispatcher = /sbin/audispd
+name_format = NONE
+##name = mydomain
+max_log_file_action = ROTATE
+space_left = 100
+verify_email = yes
+action_mail_acct = root
+admin_space_left = 75
+disk_full_action = SUSPEND
+disk_error_action = SUSPEND
+use_libwrap = yes
+##tcp_listen_port = 60
+tcp_listen_queue = 5
+tcp_max_per_addr = 1
+##tcp_client_ports = 1024-65535
+tcp_client_max_idle = 0
+enable_krb5 = no
+krb5_principal = auditd
+##krb5_key_file = /etc/audit/audit.key
+distribute_network = no
+EOF
 
 ########################################
 # Fix cron.allow
@@ -397,8 +490,8 @@ chmod 755 /etc/profile.d/autologout.csh
 cat <<EOF > /etc/profile.d/umask.sh
 #!/bin/sh
 
-# Non-Privledged Users get 027
-# Privledged Users get 022
+# Non-Privileged Users get 027
+# Privileged Users get 022
 if [[ \$EUID -ne 0 ]]; then
 	umask 027
 else
@@ -437,7 +530,7 @@ chmod 755 /etc/profile.d/vlock-alias.csh
 ########################################
 sed -i -re '/pam_wheel.so use_uid/s/^#//' /etc/pam.d/su
 sed -i 's/^#\s*\(%wheel\s*ALL=(ALL)\s*ALL\)/\1/' /etc/sudoers
-echo -e "\n## Set timeout for authentiation (5 Minutes)\nDefaults:ALL timestamp_timeout=5\n" >> /etc/sudoers
+echo -e "\n## Set timeout for authentication (5 Minutes)\nDefaults:ALL timestamp_timeout=5\n" >> /etc/sudoers
 
 
 ########################################
@@ -653,6 +746,7 @@ clock-format="12h"
 
 [org/gnome/desktop/screensaver]
 user-switch-enabled=false
+lock-enabled=true
 
 [org/gnome/desktop/session]
 idle-delay=900
@@ -662,6 +756,7 @@ disable-all=true
 
 [org/gnome/nm-applet]
 disable-wifi-create=true
+
 EOF
 	cat << EOF > /etc/dconf/db/gdm.d/locks/99-gnome-hardening
 /org/gnome/login-screen/banner-message-enable
@@ -678,6 +773,7 @@ EOF
 /org/gnome/desktop/privacy/remove-old-trash-files
 /org/gnome/desktop/privacy/old-files-age
 /org/gnome/desktop/screensaver/user-switch-enabled
+/org/gnome/desktop/screensaver/lock-enabled
 /org/gnome/desktop/session/idle-delay
 /org/gnome/desktop/thumbnailers/disable-all
 /org/gnome/nm-applet/disable-wifi-create
@@ -711,6 +807,7 @@ clock-format="12h"
 
 [org.gnome.desktop.screensaver]
 user-switch-enabled=false
+lock-enabled=true
 
 [org.gnome.desktop.session]
 idle-delay=900
@@ -720,11 +817,31 @@ disable-all=true
 
 [org.gnome.nm-applet]
 disable-wifi-create=true
+
+EOF
+
+	cat << EOF > /etc/gdm/custom.conf
+# GDM configuration storage
+[daemon]
+AutomaticLoginEnable=false
+TimedLoginEnable=false
+
+[security]
+
+[xdmcp]
+
+[greeter]
+
+[chooser]
+
+[debug]
+
 EOF
 	cp /etc/dconf/db/gdm.d/locks/99-gnome-hardening /etc/dconf/db/local.d/locks/99-gnome-hardening
  	/bin/glib-compile-schemas /usr/share/glib-2.0/schemas/
 	/bin/dconf update
 fi
+
 
 ########################################
 # Kernel - Randomize Memory Space

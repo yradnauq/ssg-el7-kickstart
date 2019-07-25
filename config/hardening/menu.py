@@ -4,11 +4,10 @@
 # This script was written by Frank Caviggia, Red Hat Consulting
 # Last update was 14 April 2017
 # This script is NOT SUPPORTED by Red Hat Global Support Services.
-# Please contact Rick Tavares for more information.
 #
-# Author: Frank Caviggia (fcaviggi@redhat.com)
+# Author: Frank Caviggia (fcaviggia@gmail.com)
 # Copyright: Red Hat, (C) 2014
-# License: GPLv2
+# License: Apache License, Version 2.0
 
 import os,sys,re,crypt,random
 try:
@@ -135,7 +134,7 @@ class Display_Menu:
                 self.hostname.set_text('localhost.localdomain')
         except:
             self.hostname.set_text('localhost.localdomain')
-        self.label = gtk.Label("              System Profile: ")                
+        self.label = gtk.Label("              System Profile: ") 
         self.system.pack_start(self.label,False,True, 0)
         self.system_profile = gtk.combo_box_new_text()
         self.system_profile.append_text("Minimal Installation")
@@ -420,7 +419,7 @@ class Display_Menu:
 
         ## STOCK CONFIGURATIONS (Minimal Install)
         # Default SSG Profile (DISA STIG)
-        self.profile='stig-rhel7-server-upstream'
+        self.profile='stig-rhel7-disa'
         # Post Configuration (nochroot)
         f = open('/tmp/hardening-post-nochroot','w')
         f.write('')
@@ -470,7 +469,7 @@ class Display_Menu:
 
         # Define SSG Security Profile
         if int(self.system_security.get_active()) == 0:
-            self.profile='stig-rhel7-server-upstream'
+            self.profile='stig-rhel7-disa'
 
         ################################################################################################################
         # Minimal (Defaults to Kickstart)
@@ -512,8 +511,6 @@ class Display_Menu:
         # IdM/IPA Authentication Server
         ################################################################################################################
         if int(self.system_profile.get_active()) == 1:
-            # Turn off FIPS 140-2 mode for Kernel
-            self.fips_kernel.set_active(False)
             # Partitioning
             if self.disk_total < 10:
                 self.MessageBox(self.window,"<b>Recommended minimum of 10Gb disk space for a IdM Authentication Server Install!</b>\n\n You have "+str(self.disk_total)+"Gb available.",gtk.MESSAGE_WARNING)
@@ -552,7 +549,7 @@ class Display_Menu:
         # RHEV-Attached KVM Server
         ################################################################################################################
         if int(self.system_profile.get_active()) == 2:
-            # WARNING - HARDENDING SCRIPT NOT RUN!
+            # WARNING - HARDENING SCRIPT NOT RUN!
             self.MessageBox(self.window,"<b>Warning:</b> Please run the following script before adding system RHEV-M:\n\n   # /root/rhevm-preinstall.sh\n\nAfter adding the system to RHEV-M, run the following:\n\n   # /root/rhevm-postinstall.sh",gtk.MESSAGE_WARNING)
             # Partitioning
             if self.disk_total < 60:
@@ -578,11 +575,8 @@ class Display_Menu:
             f.write('cp /root/hardening/rhevm*.sh /root/\n')
             # Firewall Configuration
             f.write('cp /root/hardening/iptables.sh /root/\n')
-            f.write('/root/iptables.sh --kvm\n')
-            f.write('systemctl mask firewalld\n')
-            f.write('systemctl stop firewalld\n')
-            f.write('systemctl enable iptables\n')
-            f.write('systemctl start iptables\n')
+            f.write('cp /root/hardening/firewalld.sh /root/\n')
+            f.write('/root/firewalld.sh --kvm\n')
             # Runlevel Configuration
             f.write('systemctl set-default multi-user.target\n')
             f.close()
@@ -591,7 +585,6 @@ class Display_Menu:
             f.write('-firewall*\n')
             f.write('ebtables\n')
             f.write('iptables\n')
-            f.write('iptables-services\n')
             f.write('libvirt\n')
             f.write('pciutils\n')
             f.close()
@@ -679,11 +672,8 @@ class Display_Menu:
             f.write('/usr/bin/oscap xccdf eval --profile stig-firefox-upstream --remediate --results /root/`hostname`-ssg-firefox-results.xml  --cpe /usr/share/xml/scap/ssg/content/ssg-firefox-cpe-dictionary.xml /usr/share/xml/scap/ssg/content/ssg-firefox-xccdf.xml\n')
             # Firewall Configuration
             f.write('cp /root/hardening/iptables.sh /root/\n')
-            f.write('/root/iptables.sh --kvm\n')
-            f.write('systemctl mask firewalld\n')
-            f.write('systemctl stop firewalld\n')
-            f.write('systemctl enable iptables\n')
-            f.write('systemctl start iptables\n')
+            f.write('cp /root/hardening/firewalld.sh /root/\n')
+            f.write('/root/firewalld.sh --kvm\n')
             # Runlevel Configuration
             f.write('systemctl set-default graphical.target\n')
             f.close()
@@ -714,7 +704,6 @@ class Display_Menu:
             f.write('-NetworkManager*\n')
             f.write('ebtables\n')
             f.write('iptables\n')
-            f.write('iptables-services\n')
             f.close()
 
 
@@ -742,7 +731,7 @@ class Display_Menu:
     def get_password(self,parent):
         dialog = gtk.Dialog("Configure System Password",parent,gtk.DIALOG_MODAL|gtk.DIALOG_DESTROY_WITH_PARENT,(gtk.STOCK_CANCEL,gtk.RESPONSE_REJECT,gtk.STOCK_OK,gtk.RESPONSE_ACCEPT))
         self.pass1 = gtk.HBox()
-        self.label1 = gtk.Label("          Passsword: ")
+        self.label1 = gtk.Label("           Password: ")
         self.pass1.pack_start(self.label1,False,True,0)
         self.password1 = gtk.Entry()
         self.password1.set_visibility(False)
@@ -993,38 +982,38 @@ class Display_Menu:
             self.salt = ''
             self.alphabet = '.abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             for self.i in range(16):
-                    self.index = random.randrange(len(self.alphabet))
-                    self.salt = self.salt+self.alphabet[self.index]
+				self.index = random.randrange(len(self.alphabet))
+				self.salt = self.salt+self.alphabet[self.index]
 
             # Encrypt Password
             self.salt = '$6$'+self.salt
             self.password = crypt.crypt(self.passwd,self.salt)
 
             # Write Classification Banner Settings
-            f = open('/tmp/classification-banner','w')
-            f.write('message = "'+str(self.system_classification.get_active_text())+'"\n')
-            if int(self.system_classification.get_active()) == 0 or int(self.system_classification.get_active()) == 1:
-                f.write('fgcolor = "#000000"\n')
-                f.write('bgcolor = "#00CC00"\n')
-            elif int(self.system_classification.get_active()) == 2:
-                f.write('fgcolor = "#000000"\n')
-                f.write('bgcolor = "#33FFFF"\n')
-            elif int(self.system_classification.get_active()) == 3:
-                f.write('fgcolor = "#FFFFFF"\n')
-                f.write('bgcolor = "#FF0000"\n')
-            elif int(self.system_classification.get_active()) == 4:
-                f.write('fgcolor = "#FFFFFF"\n')
-                f.write('bgcolor = "#FF9900"\n')
-            elif int(self.system_classification.get_active()) == 5:
-                f.write('fgcolor = "#000000"\n')
-                f.write('bgcolor = "#FFFF00"\n')
-            elif int(self.system_classification.get_active()) == 6:
-                f.write('fgcolor = "#000000"\n')
-                f.write('bgcolor = "#FFFF00"\n')
-            else:
-                f.write('fgcolor = "#000000"\n')
-                f.write('bgcolor = "#FFFFFF"\n')
-            f.close()
+	    f = open('/tmp/classification-banner','w')
+	    f.write('message = "'+str(self.system_classification.get_active_text())+'"\n')
+	    if int(self.system_classification.get_active()) == 0 or int(self.system_classification.get_active()) == 1:
+		f.write('fgcolor = "#FFFFFF"\n')
+		f.write('bgcolor = "#007A33"\n')
+	    elif int(self.system_classification.get_active()) == 2:
+		f.write('fgcolor = "#FFFFFF"\n')
+		f.write('bgcolor = "#0033A0"\n')
+	    elif int(self.system_classification.get_active()) == 3:
+		f.write('fgcolor = "#FFFFFF"\n')
+		f.write('bgcolor = "#C8102E"\n')
+	    elif int(self.system_classification.get_active()) == 4:
+		f.write('fgcolor = "#FFFFFF"\n')
+		f.write('bgcolor = "#FF671F"\n')
+	    elif int(self.system_classification.get_active()) == 5:
+		f.write('fgcolor = "#FFFFF"\n')
+		f.write('bgcolor = "#F7EA48"\n')
+	    elif int(self.system_classification.get_active()) == 6:
+		f.write('fgcolor = "#000000"\n')
+		f.write('bgcolor = "#F7EA48"\n')
+	    else:
+		f.write('fgcolor = "#FFFFFF"\n')
+		f.write('bgcolor = "#007A33"\n')
+	    f.close()
 
             # Write Kickstart Configuration
             f = open('/tmp/hardening','w')
