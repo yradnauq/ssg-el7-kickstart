@@ -140,7 +140,7 @@ class Display_Menu:
         self.system_profile.append_text("Minimal Installation")
         self.system_profile.append_text("IdM Authentication Server")
         self.system_profile.append_text("RHEV-Attached KVM Server")
-        self.system_profile.append_text("User Workstation")
+        self.system_profile.append_text("User Workstation - LMCO CUSTOM")
         self.system_profile.append_text("Standalone KVM Server")
         self.system_profile.set_active(0)
         self.system_profile.connect('changed',self.configure_system_profile)
@@ -591,7 +591,7 @@ class Display_Menu:
 
 
         ################################################################################################################
-        # User Workstation
+        # User Workstation (LMCO Custom)
         ################################################################################################################
         if int(self.system_profile.get_active()) == 3:
             # Partitioning
@@ -614,7 +614,7 @@ class Display_Menu:
             f = open('/tmp/hardening-post','w')
             # Run Hardening Script
             f.write('/usr/bin/oscap xccdf eval --profile '+str(self.profile)+' --remediate --results /root/`hostname`-ssg-results.xml  --cpe /usr/share/xml/scap/ssg/content/ssg-rhel7-cpe-dictionary.xml /usr/share/xml/scap/ssg/content/ssg-rhel7-xccdf.xml\n')
-            f.write('/usr/bin/oscap xccdf eval --profile stig-firefox-upstream --remediate --results /root/`hostname`-ssg-firefox-results.xml  --cpe /usr/share/xml/scap/ssg/content/ssg-firefox-cpe-dictionary.xml /usr/share/xml/scap/ssg/content/ssg-firefox-xccdf.xml\n')
+            #f.write('/usr/bin/oscap xccdf eval --profile stig-firefox-upstream --remediate --results /root/`hostname`-ssg-firefox-results.xml  --cpe /usr/share/xml/scap/ssg/content/ssg-firefox-cpe-dictionary.xml /usr/share/xml/scap/ssg/content/ssg-firefox-xccdf.xml\n')
             # Firewall Configuration
             f.write('firewall-cmd --permanent --add-service=ssh\n')
             f.write('firewall-cmd --reload\n')
@@ -642,6 +642,20 @@ class Display_Menu:
             f.write('firefox\n')
             f.write('pygtk2\n')
             f.write('vim-X11\n')
+            f.write('vim\n')
+            f.write('lsof\n')
+            f.write('policycoreutils-python\n')
+            f.write('ntp\n')
+            f.write('rdate\n')
+            f.write('tcsh\n')
+            f.write('audispd-plugins\n')
+            f.write('iptables-services\n')
+            f.write('ypbind\n')
+            f.write('yp-tools\n')
+            f.write('autofs\n')
+            f.write('nfs-utils\n')
+            f.write('bind-utils\n')
+            f.write('net-tools\n')
             f.close()
 
 
