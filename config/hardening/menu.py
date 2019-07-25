@@ -1034,7 +1034,7 @@ class Display_Menu:
             f.write('network --hostname '+self.hostname.get_text()+'\n')
             f.write('rootpw --iscrypted '+str(self.password)+' --lock\n') 
             f.write('bootloader --location=mbr --driveorder='+str(self.data["INSTALL_DRIVES"])+' --append="crashkernel=auto rhgb quiet audit=1" --password='+str(self.a)+'\n') 
-            f.write('user --name=admin --groups=wheel --password='+str(self.password)+' --iscrypted \n') 
+            f.write('user --name=admin --groups=wheel --homedir=/export/home/admin --password='+str(self.password)+' --iscrypted \n') 
             f.close()
             f = open('/tmp/partitioning','w')
             if self.data["IGNORE_DRIVES"] != "":
@@ -1048,18 +1048,18 @@ class Display_Menu:
             f.write('part /boot --fstype=xfs --size=1024\n')
             if os.path.isdir('/sys/firmware/efi'):
                 f.write('part /boot/efi --fstype=efi --size=200\n')
-            f.write('volgroup vg1 --pesize=4096 pv.01\n')
-            f.write('logvol / --fstype=xfs --name=lv_root --vgname=vg1 --percent='+str(self.root_partition.get_value_as_int())+'\n')
-            f.write('logvol /home --fstype=xfs --name=lv_home --vgname=vg1 --percent='+str(self.home_partition.get_value_as_int())+'\n')
-            f.write('logvol /tmp --fstype=xfs --name=lv_tmp --vgname=vg1 --percent='+str(self.tmp_partition.get_value_as_int())+'\n')
-            f.write('logvol /var --fstype=xfs --name=lv_var --vgname=vg1 --percent='+str(self.var_partition.get_value_as_int())+'\n')
-            f.write('logvol /var/log --fstype=xfs --name=lv_log --vgname=vg1 --percent='+str(self.log_partition.get_value_as_int())+'\n')
-            f.write('logvol /var/log/audit --fstype=xfs --name=lv_audit --vgname=vg1 --percent='+str(self.audit_partition.get_value_as_int())+'\n')
-            f.write('logvol swap --fstype=swap --name=lv_swap --vgname=vg1 --maxsize=4096 --percent='+str(self.swap_partition.get_value_as_int())+'\n')
+            f.write('volgroup rhel --pesize=4096 pv.01\n')
+            f.write('logvol /              --fstype=xfs --name=lv_root  --vgname=rhel --percent='+str(self.root_partition.get_value_as_int())+'\n')
+            f.write('logvol /export/home   --fstype=xfs --name=lv_home  --vgname=rhel --percent='+str(self.home_partition.get_value_as_int())+'\n')
+            f.write('logvol /tmp           --fstype=xfs --name=lv_tmp   --vgname=rhel --percent='+str(self.tmp_partition.get_value_as_int())+'\n')
+            f.write('logvol /var           --fstype=xfs --name=lv_var   --vgname=rhel --percent='+str(self.var_partition.get_value_as_int())+'\n')
+            f.write('logvol /var/log       --fstype=xfs --name=lv_log   --vgname=rhel --percent='+str(self.log_partition.get_value_as_int())+'\n')
+            f.write('logvol /var/log/audit --fstype=xfs --name=lv_audit --vgname=rhel --percent='+str(self.audit_partition.get_value_as_int())+'\n')
+            f.write('logvol swap           --fstype=swap --name=lv_swap --vgname=rhel --maxsize=4096 --percent='+str(self.swap_partition.get_value_as_int())+'\n')
             if self.opt_partition.get_value_as_int() >= 1:
-                f.write('logvol /opt --fstype=xfs --name=lv_opt --vgname=vg1 --percent='+str(self.opt_partition.get_value_as_int())+'\n')
+                f.write('logvol /opt --fstype=xfs --name=lv_opt --vgname=rhel --percent='+str(self.opt_partition.get_value_as_int())+'\n')
             if self.www_partition.get_value_as_int() >= 1:
-                f.write('logvol /var/www --fstype=xfs --name=lv_www --vgname=vg1 --percent='+str(self.www_partition.get_value_as_int())+'\n')
+                f.write('logvol /var/www --fstype=xfs --name=lv_www --vgname=rhel --percent='+str(self.www_partition.get_value_as_int())+'\n')
             f.close()
             gtk.main_quit()
 
